@@ -12,7 +12,12 @@ canvas {
 <body>
 <div>
   <p>Press F12 to show raw serial output.</p>
-  <p>BPM: <span id="bpm">?</span></p>
+  <ul>
+    <li>ADC value: <span id="adc">?</span></li>
+    <li>BPM: <span id="bpm">?</span></li>
+    <li>Max. RR: <span id="max-rr">?</span></li>
+    <li>Min. RR: <span id="min-rr">?</span></li>
+  </ul>
   <button id="connect">Connect MSP board</button>
   <button id="disconnect" hidden>Disconnect MSP board</button>
 </div>
@@ -25,30 +30,25 @@ canvas {
   <canvas width="768" height="768">
 </div>
 <script>
+// Code referenced from ltgcgo/rochelle, licensed under GNU LGPL 3.0
+"use strict";(()=>{var L=Object.defineProperty;var R=(a,t,s)=>t in a?L(a,t,{enumerable:!0,configurable:!0,writable:!0,value:s}):a[t]=s;var m=(a,t,s)=>(R(a,typeof t!="symbol"?t+"":t,s),s);var o=["utf-8","utf-16","utf-16be"],b=(a,t)=>{a.unsent=!1,a.enqueue(t)},w,S=(w=class{static lineRaw(a,t=0){if(t?.constructor!=Number||t<0||t>=o.length)throw new TypeError("Invalid split mode");if(t)throw new Error("UTF-16LE/BE currently not implemented");if(!a||a?.constructor!=ReadableStream)throw new TypeError("Not a readable stream");let s=a.getReader(),n,c=!1,e=[],r=0,l=0,y=0;return new ReadableStream({pull:async h=>{for(h.unsent=!0;h.unsent;){if(!n||r>=n.length){r>l&&(e.push(n.subarray(l)),l=0);let{value:g,done:u}=await s.read();n=g,c=u,r=0}if(n){let g=n[r],u=!1;switch(g){case 10:{y==13?l++:u=!0;break}case 13:{u=!0;break}}if(u){if(e.length){e.push(n.subarray(l,r));let d=0;for(let f=0;f<e.length;f++)d+=e[f].length;let i=new Uint8Array(d),T=0;for(let f=0;f<e.length;f++)i.set(e[f],T),T+=e[f].length;b(h,i),e=[]}else b(h,n.subarray(l,r));l=r+1}y=g}if(c){if(l!=r&&e.push(n.subarray(l,r)),e.length){let g=0;for(let i=0;i<e.length;i++)g+=e[i].length;let u=new Uint8Array(g),d=0;for(let i=0;i<e.length;i++)u.set(e[i],d),d+=e[i].length;b(h,u)}h.unsent=!1,h.close()}r++}}},new ByteLengthQueuingStrategy({highWaterMark:256}))}static line(a,t=0,s){let n=this.lineRaw(a,t).getReader(),c=new TextDecoder(s||o[t]);return new ReadableStream({pull:async e=>{let{value:r,done:l}=await n.read();r&&e.enqueue(c.decode(r)),l&&e.close()}})}},m(w,"SPLIT_UTF_8",0),m(w,"SPLIT_UTF_16_LE",1),m(w,"SPLIT_UTF_16_BE",2),w),E=S;self.TextReader=E;})();
+</script>
+<script>
 "use strict";
 const cnv = document.querySelector("canvas");
 const ctx = cnv.getContext("2d");
 
+let DELAY = 2;
+let UPPER_LIMIT = 255;
+
 /*
-let data = [
-  0x90, 0xA7, 0x8D, 0xA8, 0x8E, 0xA7, 0x92, 0x9F, 0x93, 0x88, 0x91, 0x89, 0xAC, 0x8A, 0xB2, 0x98,
-  0xAD, 0xA3, 0xB0, 0xB2, 0xA3, 0xBA, 0xA5, 0xD0, 0xCC, 0xDA, 0x89, 0xA9, 0x9F, 0xA4, 0xAD, 0xA1,
-  0xB6, 0x95, 0xBB, 0x94, 0xB5, 0x9E, 0xA5, 0xA0, 0x9B, 0xA7, 0x88, 0xAA, 0x8C, 0xB2, 0x9B, 0xB3,
-  0xA1, 0xA8, 0xAA, 0x98, 0xAA, 0x8F, 0xAB, 0x8C, 0xA7, 0x8C, 0x9C, 0x95, 0x8F, 0x9C, 0x88, 0xA1,
-  0x80, 0xA5, 0x82, 0x9E, 0x8A, 0x91, 0x91, 0x85, 0x9C, 0x7D, 0x99, 0x77, 0x94, 0x73, 0x87, 0x73,
-  0x79, 0x7C, 0x6C, 0x81, 0x63, 0x86, 0x61, 0x7F, 0x66, 0x7A, 0x96, 0xA5, 0x85, 0x58, 0x7A, 0x58,
-  0x77, 0x58, 0x77, 0x5F, 0x70, 0x6C, 0x63, 0x7B, 0x5D, 0x7D, 0x5C, 0x7A, 0x61, 0x75, 0x65, 0x6B,
-  0x71, 0x63, 0x7A, 0x5A, 0x77, 0x55, 0x72, 0x56, 0x66, 0x5D, 0x59, 0x66, 0x51, 0x6B, 0x4A, 0x6E,
-  0x50, 0x67, 0x57, 0x60, 0x60, 0x5B, 0x6D, 0x50, 0x71, 0x52, 0x75, 0x61, 0x72, 0x69, 0x68, 0x72,
-  0x62, 0x7C, 0x60, 0x81, 0x60, 0x7B, 0x66, 0x6F, 0x6E, 0x66, 0x77, 0x61, 0x7E, 0x61, 0x5F, 0x64,
-  0x0F, 0x3D, 0x13, 0x2E, 0x0B, 0x20, 0x1E, 0x30, 0x4C, 0x31, 0x42, 0x25, 0x46, 0x2E, 0x58, 0x40,
-  0x5A, 0x64, 0x6A, 0x7A, 0x6B, 0x88, 0x6F, 0x90, 0x75, 0x92, 0x82, 0x9D, 0x9A, 0x9A, 0xAC, 0xA0
-];
-*/
 let data = [
   0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F
 ];
+*/
+let data = [];
 let rawData = "";
+let text;
 let decoder = new TextDecoder();
 
 let isRefresh = true;
@@ -58,10 +58,13 @@ let plotGraph = function () {
 
   if (currentFrame == 0)
     lastData = data[data.length - 1];
+    // lastData = data[data.length - 1] * 255 / UPPER_LIMIT;
   else
     lastData = data[currentFrame - 1];
+    // lastData = data[currentFrame - 1] * 255 / UPPER_LIMIT;
 
   drawPoint(data[currentFrame], lastData);
+  // drawPoint(data[currentFrame] * 255 / UPPER_LIMIT, lastData);
 
   if (currentFrame != data.length)
     currentFrame++;
@@ -69,13 +72,12 @@ let plotGraph = function () {
     currentFrame = 0;
 };
 let timer;
-// let timer = setInterval(readData, 100);
 
 const toggleRefresh = document.getElementById("toggleRefresh");
 toggleRefresh.addEventListener("click", () => {
   isRefresh = !isRefresh;
   if (isRefresh)
-    timer = setInterval(readData, 100);
+    timer = setInterval(processData, DELAY);
   else
     clearInterval(timer);
   toggleRefresh.innerText = isRefresh ? "Stop refreshing" : "Start refreshing";
@@ -119,58 +121,62 @@ let drawPoint = function (newData, lastData, shiftAmount = 3) {
   ctx.stroke();
 };
 
-let port, reader;
+let port;
 document.getElementById("connect").addEventListener("click", async () => {
   port = await navigator.serial.requestPort();
   document.getElementById("connect").disabled = true;
   document.getElementById("disconnect").hidden = false;
   console.log(port.getInfo());
   await port.open({ baudRate: 9600 });
-  reader = port.readable.getReader();
-  timer = setInterval(readData, 100);
+  // let reader = port.readable.getReader();
+  let textStream = TextReader.line(port.readable);
+
+  while (isRefresh) {
+    try {
+      for await (const line of textStream) {
+        console.info(line);
+        processData(line);
+      };
+    } catch (err) {
+      console.error(err);
+      textStream = TextReader.line(port.readable); // reset ReadableStream
+    };
+  };
+
+  // timer = setInterval(processData, DELAY);
 });
 
-let readData = async function () {
+let processData = function (line) {
+  /*
   if (!port?.readable) {
     // document.getElementById("toggleRefresh").click();
     isRefresh = false;
     return;
   }
-  let temp;
+  */
+  let temp = line.split(":");
+  if (temp.length < 4) {
+    console.warn(`Incomplete line: ${line}`); // Toss out incomplete lines
+  }
+  temp.forEach((e, i, a) => {
+    a[i] = parseInt(e);
+  });
+  data.push(temp[0]);
+  plotGraph();
+  console.info(temp);
+
   try {
-    const {value, done} = await reader.read();
-
-    temp = decoder.decode(value).split(":");
-    temp.forEach((e, i, a) => {
-      if (i == 1) {
-        a[i] = parseInt(e.slice(0, -1));
-      }
-      else {
-        a[i] = parseInt(e);
-      }
-    });
-    // data.push(value);
-    data.push(temp[0]);
-    rawData.concat(decoder.decode(value));
-    plotGraph();
-    // console.log(temp);
-
-    try {
-      // document.getElementById("bpm").childNode[0].data = temp[1];
-      document.getElementById("bpm").innerText = temp[1];
-    } catch {}
-
-    if (done) {
-      reader.releaseLock();
-    }
-    if (value) {
-      console.log(decoder.decode(value));
-    }
+    document.getElementById("adc").textContent = temp[0];
+    document.getElementById("bpm").textContent = temp[1];
+    document.getElementById("max-rr").textContent = temp[2];
+    document.getElementById("min-rr").textContent = temp[3];
   } catch (err) {
     console.error(err);
-    reader = port.readable.getReader(); // reset ReadableStream
   }
-}
+
+  rawData.concat(line);
+  console.info(rawData);
+};
 
 document.getElementById("disconnect").addEventListener("click", async () => {
   document.getElementById("connect").disabled = false;
