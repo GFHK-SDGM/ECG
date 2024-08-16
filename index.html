@@ -11,6 +11,8 @@ canvas {
 </head>
 <body>
 <div>
+  <p>Press F12 to show raw serial output.</p>
+  <p>BPM: <span id="bpm">?</span></p>
   <button id="connect">Connect MSP board</button>
   <button id="disconnect" hidden>Disconnect MSP board</button>
 </div>
@@ -46,6 +48,8 @@ let data = [
 let data = [
   0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F
 ];
+let rawData = "";
+let decoder = new TextDecoder();
 
 let isRefresh = true;
 let currentFrame = 0;
@@ -64,6 +68,7 @@ let plotGraph = function () {
   else
     currentFrame = 0;
 };
+let timer;
 // let timer = setInterval(readData, 100);
 
 const toggleRefresh = document.getElementById("toggleRefresh");
@@ -118,27 +123,59 @@ let port, reader;
 document.getElementById("connect").addEventListener("click", async () => {
   port = await navigator.serial.requestPort();
   document.getElementById("connect").disabled = true;
+  document.getElementById("disconnect").hidden = false;
   console.log(port.getInfo());
-  port.open({ baudRate: 9600 });
+  await port.open({ baudRate: 9600 });
   reader = port.readable.getReader();
+  timer = setInterval(readData, 100);
 });
 
 let readData = async function () {
-  const {value, done} = await reader.read();
-  data = value;
-  plotData();
-  if (done) {
-    // data = value;
-    reader.releaseLock();
-    break;
+  if (!port?.readable) {
+    // document.getElementById("toggleRefresh").click();
+    isRefresh = false;
+    return;
+  }
+  let temp;
+  try {
+    const {value, done} = await reader.read();
+
+    temp = decoder.decode(value).split(":");
+    temp.forEach((e, i, a) => {
+      if (i == 1) {
+        a[i] = parseInt(e.slice(0, -1));
+      }
+      else {
+        a[i] = parseInt(e);
+      }
+    });
+    // data.push(value);
+    data.push(temp[0]);
+    rawData.concat(decoder.decode(value));
+    plotGraph();
+    // console.log(temp);
+
+    try {
+      // document.getElementById("bpm").childNode[0].data = temp[1];
+      document.getElementById("bpm").innerText = temp[1];
+    } catch {}
+
+    if (done) {
+      reader.releaseLock();
+    }
+    if (value) {
+      console.log(decoder.decode(value));
+    }
+  } catch (err) {
+    console.error(err);
+    reader = port.readable.getReader(); // reset ReadableStream
   }
 }
-// let timer = setInterval(readData, 100);
 
 document.getElementById("disconnect").addEventListener("click", async () => {
   document.getElementById("connect").disabled = false;
   document.getElementById("disconnect").hidden = true;
-  await mspDevice.forget();
+  await port.forget();
 });
 
 navigator.serial.addEventListener("disconnect", (e) => {
@@ -157,7 +194,7 @@ let saveFile = (blob) => {
 };
 
 document.getElementById("save").addEventListener("click", () => {
-  saveFile(new Blob([data]));
+  saveFile(new Blob([rawData]));
 });
 </script>
 </body>
