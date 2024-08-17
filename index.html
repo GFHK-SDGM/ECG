@@ -131,10 +131,16 @@ document.getElementById("connect").addEventListener("click", async () => {
   // let reader = port.readable.getReader();
   let textStream = TextReader.line(port.readable);
 
+  /*
+  setTimeout(async () => {
+    await port.forget();
+  }, 10000);
+  */
+
   while (isRefresh) {
     try {
       for await (const line of textStream) {
-        console.info(line);
+        // console.info(line);
         processData(line);
       };
     } catch (err) {
@@ -147,23 +153,22 @@ document.getElementById("connect").addEventListener("click", async () => {
 });
 
 let processData = function (line) {
-  /*
-  if (!port?.readable) {
-    // document.getElementById("toggleRefresh").click();
-    isRefresh = false;
-    return;
-  }
-  */
   let temp = line.split(":");
   if (temp.length < 4) {
-    console.warn(`Incomplete line: ${line}`); // Toss out incomplete lines
+    if (line != "")
+      console.warn(`Incomplete line: ${line}`); // Toss out incomplete lines
+      return;
   }
   temp.forEach((e, i, a) => {
     a[i] = parseInt(e);
   });
+  if (isNaN(temp[0])) {
+    console.warn(`Corrupted line: ${line}`);
+    return;
+  }
   data.push(temp[0]);
   plotGraph();
-  console.info(temp);
+  // console.info(temp);
 
   try {
     document.getElementById("adc").textContent = temp[0];
@@ -174,8 +179,9 @@ let processData = function (line) {
     console.error(err);
   }
 
-  rawData.concat(line);
-  console.info(rawData);
+  console.info(line);
+  rawData = rawData.concat(`${line}\n`);
+  // console.info(`Output file content:\n${rawData}`);
 };
 
 document.getElementById("disconnect").addEventListener("click", async () => {
