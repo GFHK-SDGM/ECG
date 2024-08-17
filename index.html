@@ -32,6 +32,19 @@ canvas {
 <script>
 // Code referenced from ltgcgo/rochelle, licensed under GNU LGPL 3.0
 "use strict";(()=>{var L=Object.defineProperty;var R=(a,t,s)=>t in a?L(a,t,{enumerable:!0,configurable:!0,writable:!0,value:s}):a[t]=s;var m=(a,t,s)=>(R(a,typeof t!="symbol"?t+"":t,s),s);var o=["utf-8","utf-16","utf-16be"],b=(a,t)=>{a.unsent=!1,a.enqueue(t)},w,S=(w=class{static lineRaw(a,t=0){if(t?.constructor!=Number||t<0||t>=o.length)throw new TypeError("Invalid split mode");if(t)throw new Error("UTF-16LE/BE currently not implemented");if(!a||a?.constructor!=ReadableStream)throw new TypeError("Not a readable stream");let s=a.getReader(),n,c=!1,e=[],r=0,l=0,y=0;return new ReadableStream({pull:async h=>{for(h.unsent=!0;h.unsent;){if(!n||r>=n.length){r>l&&(e.push(n.subarray(l)),l=0);let{value:g,done:u}=await s.read();n=g,c=u,r=0}if(n){let g=n[r],u=!1;switch(g){case 10:{y==13?l++:u=!0;break}case 13:{u=!0;break}}if(u){if(e.length){e.push(n.subarray(l,r));let d=0;for(let f=0;f<e.length;f++)d+=e[f].length;let i=new Uint8Array(d),T=0;for(let f=0;f<e.length;f++)i.set(e[f],T),T+=e[f].length;b(h,i),e=[]}else b(h,n.subarray(l,r));l=r+1}y=g}if(c){if(l!=r&&e.push(n.subarray(l,r)),e.length){let g=0;for(let i=0;i<e.length;i++)g+=e[i].length;let u=new Uint8Array(g),d=0;for(let i=0;i<e.length;i++)u.set(e[i],d),d+=e[i].length;b(h,u)}h.unsent=!1,h.close()}r++}}},new ByteLengthQueuingStrategy({highWaterMark:256}))}static line(a,t=0,s){let n=this.lineRaw(a,t).getReader(),c=new TextDecoder(s||o[t]);return new ReadableStream({pull:async e=>{let{value:r,done:l}=await n.read();r&&e.enqueue(c.decode(r)),l&&e.close()}})}},m(w,"SPLIT_UTF_8",0),m(w,"SPLIT_UTF_16_LE",1),m(w,"SPLIT_UTF_16_BE",2),w),E=S;self.TextReader=E;})();
+
+let codepointArray = function (string) {
+  let arr = new Uint16Array(string.length);
+  arr.forEach((e, i, a) => {
+    a[i] = string.charCodeAt(i);
+  });
+  return arr;
+};
+let sleep = async function (ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+};
 </script>
 <script>
 "use strict";
@@ -40,6 +53,7 @@ const ctx = cnv.getContext("2d");
 
 let DELAY = 2;
 let UPPER_LIMIT = 255;
+let FRAMERATE = 50;
 
 /*
 let data = [
@@ -76,10 +90,12 @@ let timer;
 const toggleRefresh = document.getElementById("toggleRefresh");
 toggleRefresh.addEventListener("click", () => {
   isRefresh = !isRefresh;
+  /*
   if (isRefresh)
     timer = setInterval(processData, DELAY);
   else
     clearInterval(timer);
+  */
   toggleRefresh.innerText = isRefresh ? "Stop refreshing" : "Start refreshing";
 });
 
@@ -141,7 +157,7 @@ document.getElementById("connect").addEventListener("click", async () => {
     try {
       for await (const line of textStream) {
         // console.info(line);
-        processData(line);
+        await processData(line);
       };
     } catch (err) {
       console.error(err);
@@ -152,17 +168,19 @@ document.getElementById("connect").addEventListener("click", async () => {
   // timer = setInterval(processData, DELAY);
 });
 
-let processData = function (line) {
+let processData = async function (line) {
   let temp = line.split(":");
   if (temp.length < 4) {
-    if (line != "")
+    if (line != "") {
       console.warn(`Incomplete line: ${line}`); // Toss out incomplete lines
-      return;
+    }
+    return;
   }
   temp.forEach((e, i, a) => {
     a[i] = parseInt(e);
   });
   if (isNaN(temp[0])) {
+    // console.warn(`Corrupted line: ${codepointArray(line).join(" ")}`);
     console.warn(`Corrupted line: ${line}`);
     return;
   }
@@ -182,6 +200,7 @@ let processData = function (line) {
   console.info(line);
   rawData = rawData.concat(`${line}\n`);
   // console.info(`Output file content:\n${rawData}`);
+  await sleep(FRAMERATE);
 };
 
 document.getElementById("disconnect").addEventListener("click", async () => {
