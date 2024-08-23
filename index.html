@@ -17,6 +17,7 @@ canvas {
     <li>BPM: <span id="bpm">?</span></li>
     <li>Max. RR: <span id="max-rr">?</span></li>
     <li>Min. RR: <span id="min-rr">?</span></li>
+    <li>SDNN: <span id="sdnn">?</span></li>
   </ul>
   <button id="connect">Connect MSP board</button>
   <button id="disconnect" hidden>Disconnect MSP board</button>
@@ -193,6 +194,7 @@ let processData = async function (line) {
     document.getElementById("bpm").textContent = temp[1];
     document.getElementById("max-rr").textContent = temp[2];
     document.getElementById("min-rr").textContent = temp[3];
+    document.getElementById("sdnn").textContent = temp[4];
   } catch (err) {
     console.error(err);
   }
